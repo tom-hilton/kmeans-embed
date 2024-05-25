@@ -1,0 +1,35 @@
+# CMake build directory
+build/
+bin/
+data/
+
+# CMake generated files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# Compiled object files
+*.o
+*.obj
+*.a
+
+# Executables
+*.exe
+*.out
+
+# Visual Studio Code
+.vscode/
+
+# JetBrains CLion
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Third-party data directories
+mnist_png/
+BSDS/
+BSDS_RIND/
+multicue/
+BIPED/
