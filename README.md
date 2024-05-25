@@ -1,6 +1,8 @@
 # _Vector Quantization with K-Means_
 
-This application loads an image dataset, vector quantizes with K-Means and saves it as HDF5 files. It was originally created as a minimal encoding/embedding to make iterating  novel vision transformer techniques extremely fast The k-dimensional tree approach is used to speed up the quantization process. 
+This application loads an image dataset, vector quantizes with K-Means and saves it as HDF5 files. It was originally created as a minimal encoding/embedding to make iterating  novel vision transformer techniques extremely fast The k-dimensional tree approach is used to speed up the quantization process.
+
+Note that the saved HDF5 files contain the encoded images as a `data` variable, and target `labels`. Samples are stored column-wise, as most matrix libraries such as Eigen, Armadillo and Bandicoot also store column-wise.
 
 ## Build Notes & Dependencies
 

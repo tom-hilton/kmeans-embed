@@ -166,7 +166,8 @@ void processImagesInBatches(const std::vector<std::string>& imagePaths, const in
         cv::Mat batchPatchesMat;
         cv::hconcat(batchPatches, batchPatchesMat);
         batchPatchesMat.convertTo(batchPatchesMat, CV_32F);
-        cv::transpose(batchPatchesMat, batchPatchesMat);
+        // cv::transpose(batchPatchesMat, batchPatchesMat);
+        cv::transpose(batchOneHotLabels, batchOneHotLabels);
 
         // Save to file
         saveHDF5(destDir + std::to_string(batchIndex++) + ".h5", batchPatchesMat, batchOneHotLabels);
