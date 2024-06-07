@@ -1,8 +1,18 @@
-# _Vector Quantization with K-Means_
+# _Soft Cluster Membership as an Embedding_
 
-This application loads an image dataset, vector quantizes with K-Means and saves it as HDF5 files. It was originally created as a minimal encoding/embedding to make iterating  novel vision transformer techniques extremely fast The k-dimensional tree approach is used to speed up the quantization process.
+This application loads an image dataset, creates an embedding based on probability of cluster membership, adds a positional encoding and saves it as HDF5 files. 
+
+### The details
+
+The program first crops each image to a square, then divides the images into patches. Cluster centroids are then created using the K-means++ method from a subset of patches. Every patch from every image then has its cosine similarity to each centroid calculated. Softmax is then applied to give the probability of a given patch belonging to each of the centroids.
+
+Positional encoding is 2D sinusoidal, with an added image edge marker.
+
+It was originally created as a non-trained encoding/embedding for vision transformer experimentation.
 
 Note that the saved HDF5 files contain the encoded images as a `data` variable, and target `labels`. Samples are stored column-wise, as most matrix libraries such as Eigen, Armadillo and Bandicoot also store column-wise.
+
+Images are also saved that show the centroids generated, and an interpretation of each part of the positional embedding.
 
 ## Build Notes & Dependencies
 
@@ -12,7 +22,7 @@ First git clone the repository. Because it is private you will need to use the g
 
 Once cloned, on both platforms you then create and activate a conda environment in which to compile the program. Run the commands below at your terminal, replacing `<ENV_NAME>` with a name of your choosing:
 
-`conda create -n <ENV_NAME> -c conda-forge cmake llvm-openmp cxx-compiler c-compiler opencv hdf5 highfive`
+`conda create -n <ENV_NAME> -c conda-forge cmake llvm-openmp cxx-compiler c-compiler opencv hdf5 highfive armadillo`
 
 `conda activate <ENV_NAME>`
 
@@ -28,18 +38,23 @@ From a top-level `build` directory (you'll need to create one), run the followin
 
 Then set up the required dataset as below. Finally run the compiled program with:
 
-`./vector_quant <SOURCE_DIR> <DEST_DIR>  <IMAGE_HEIGHT> <PATCH_HEIGHT> <KMEANS_CLUSTERS> <PATCH_PERCENTAGE_FOR_KMEANS> <IMAGES_PER_HDF5>`
+`./kmeans_embed <SOURCE_DIR> <DEST_DIR>  <IMAGE_HEIGHT> <PATCH_HEIGHT> <KMEANS_CLUSTERS> <PATCH_PERCENTAGE_FOR_KMEANS> <IMAGES_PER_HDF5>`
 
 For example:
 
-`./vector_quant ../data/imagenette2-160 ../data  160 6 144 0.05 1000`
+`./kmeans_embed ../data/imagenette2-160 ../data  160 8 256 0.2 1000`
 
-On an Apple M2 Pro Macbook this takes around 90 sec total for all 10k training files & 4k validation files.
+This would crop source images to 160x160 square, then divide into 8x8 patches, create 256 centroids from 20% of patches in the training files, and save 1000 images per HDF5 file, saving them to "../data".
+
+On an Apple M2 Pro Macbook most processing takes around 2-20 minutes in total for Imagenette (all 10k training files & 4k validation files), depending on the arguments supplied. For the example above, it should take just under 4 minutes. For Imagenet-1K it is around 6 hours.
 
 ## Setting up the data:
 
-This is tested against the Imagenette datasets (Full/320/160/Woof/Wang). It should work for anything in the same arrangement: `train` and `val` directories under the main folder, with subdirectories providing the category labels, then each subdirectory containing JPEG image files.
+This is tested against the Imagenette datasets (Full/320/160/Woof/Wang). It should work for anything in the same arrangement: `train` and `val` directories under the main folder, with subdirectories providing the category labels, then each subdirectory containing JPEG/JPG/PNG image files. Examples would be [CIFAR10](https://www.cs.toronto.edu/~kriz/cifar.html) or the Kaggle version of [Imagenet-1K](https://www.kaggle.com/datasets/sautkin/imagenet1k0).
 
-- Download one of the Imagenette datasets from [Github](https://github.com/fastai/imagenette). Unzip & place it under a top-level `data` directory.
+To use Imagenette:
+
+- Download one of the Imagenette datasets from [Github](https://github.com/fastai/imagenette). 
+- Unzip & place it under a top-level `data` directory.
 - Also create empty `train` and `val` directories under the `data` directory - the output HDF5 files are stored in these.
 
