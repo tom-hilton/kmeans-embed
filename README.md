@@ -6,7 +6,7 @@ This application loads an image dataset, creates an embedding based on probabili
 
 The program first crops each image to a square, then divides the images into patches. Cluster centroids are then created using the K-means++ method from a subset of patches. Every patch from every image then has its cosine similarity to each centroid calculated. Softmax is then applied to give the probability of a given patch belonging to each of the centroids.
 
-Positional encoding is 2D sinusoidal, with an added image edge marker.
+Positional encoding is traditional 2D sinusoidal (with an optional added image edge marker) that is summed with the embedding prior to saving.
 
 It was originally created as a non-trained encoding/embedding for vision transformer experimentation.
 

@@ -281,42 +281,87 @@ cv::Mat applySoftmax(const cv::Mat& input) {
     return output;
 }
 
-// Function to generate 2d sinusoidal positional encoding (with edge marker) for each patch
-cv::Mat generatePositionalEncoding(int patchCount, int patchPerRow) {
-    int dimension = 2; // x and y coordinates
-    cv::Mat positionalEncoding = cv::Mat::zeros(patchCount, dimension + 1, CV_64F); // +1 for border marker
-    for (int i = 0; i < patchCount; ++i) {      // Iterate over each patch
-        for (int j = 0; j < dimension; ++j) {   // Iterate over each dimension
-            // Calculate the sinusoidal encoding
-            positionalEncoding.at<double>(i, j) = sin((double)i / (pow(10000, (double)(j+1) / dimension)));
+// Function to generate 2d sinusoidal positional encoding (with optional edge marker) for each patch
+cv::Mat generatePositionalEncoding(int patchCount, int patchesPerRow, int d_model, bool includeBorderMarkers) {
+    // Calculate the number of dimensions allocated for positional encoding
+    int encodingDimensions = d_model - (includeBorderMarkers ? 2 : 0);
+    int halfDModel = encodingDimensions / 2;  // Half of dimensions for x, half for y
+
+    cv::Mat positionalEncoding = cv::Mat::zeros(patchCount, d_model, CV_64F);
+
+    // Calculate the frequency scaling factor for positional encoding
+    double freqScale = 10000.0;
+
+    for (int i = 0; i < patchCount; ++i) {
+        int row = i / patchesPerRow; // Calculate the row index of the patch
+        int col = i % patchesPerRow; // Calculate the column index of the patch
+
+        for (int j = 0; j < halfDModel; j++) {
+            double posFactor = pow(freqScale, 2.0 * j / halfDModel);
+
+            // Sine and Cosine encoding for x (col) position
+            positionalEncoding.at<double>(i, j) = sin(col / posFactor);
+            positionalEncoding.at<double>(i, j + 1) = cos(col / posFactor);
+
+            // Sine and Cosine encoding for y (row) position
+            positionalEncoding.at<double>(i, halfDModel + j) = sin(row / posFactor);
+            positionalEncoding.at<double>(i, halfDModel + j + 1) = cos(row / posFactor);
         }
-        // Add border marker
-        int row = i / patchPerRow;
-        int col = i % patchPerRow;
-        if (row == 0 || row == patchPerRow - 1 || col == 0 || col == patchPerRow - 1) {
-            positionalEncoding.at<double>(i, dimension) = 1.0; // border patch
-        } else {
-            positionalEncoding.at<double>(i, dimension) = 0.0; // non-border patch
+
+        // Handle border markers if needed
+        if (includeBorderMarkers) {
+            positionalEncoding.at<double>(i, d_model - 2) = (row == 0 || row == patchesPerRow - 1) ? 1.0 : 0.0;  // Top or Bottom border
+            positionalEncoding.at<double>(i, d_model - 1) = (col == 0 || col == patchesPerRow - 1) ? 1.0 : 0.0;  // Left or Right border
         }
     }
+
     return positionalEncoding;
 }
 
-// Save each column of the positional encoding as an image
-void savePositionalEncodingAsImages(const cv::Mat& positionalEncoding, int patchPerRow, const std::string& basePath) {
-    // Iterate over each positional encoding dimension
-    for (int i = 0; i < positionalEncoding.cols; ++i) {
-        cv::Mat column = positionalEncoding.col(i).clone();
-        cv::Mat image = column.reshape(1, patchPerRow);     // Reshape to 2D image
-        
-        // Normalize the values to [0, 255] and convert to CV_8U
-        cv::normalize(image, image, 0, 255, cv::NORM_MINMAX, CV_8U);
+// Save an interpretation of the positional encodings as images
+void savePositionalEncodingAsImages(int patchesPerRow, int d_model, bool includeBorderMarkers, const std::string& savePath) {
+    int patchCount = patchesPerRow * patchesPerRow;
+    cv::Mat encoding = generatePositionalEncoding(patchCount, patchesPerRow, d_model, includeBorderMarkers);
 
-        std::string filename = basePath + "/positionalEncoding" + std::to_string(i) + ".png";
-        bool success = cv::imwrite(filename, image);
-        if (!success) {
-            std::cerr << "Failed to save image: " << filename << std::endl;
+    // Compute the sum of X and Y encodings and save them as images
+    cv::Mat xSum = cv::Mat::zeros(patchesPerRow, patchesPerRow, CV_64F);
+    cv::Mat ySum = cv::Mat::zeros(patchesPerRow, patchesPerRow, CV_64F);
+    cv::Mat borderSum;
+
+    if (includeBorderMarkers) {
+        borderSum = cv::Mat::zeros(patchesPerRow, patchesPerRow, CV_64F);
+    }
+
+    for (int i = 0; i < patchCount; ++i) {
+        int row = i / patchesPerRow;
+        int col = i % patchesPerRow;
+
+        for (int j = 0; j < d_model / 2 - 1; j += 2) {
+            xSum.at<double>(row, col) += encoding.at<double>(i, j) + encoding.at<double>(i, j + 1);
         }
+
+        for (int j = d_model / 2; j < d_model - (includeBorderMarkers ? 2 : 0); j += 2) {
+            ySum.at<double>(row, col) += encoding.at<double>(i, j) + encoding.at<double>(i, j + 1);
+        }
+
+        if (includeBorderMarkers) {
+            borderSum.at<double>(row, col) = encoding.at<double>(i, d_model - 2) + encoding.at<double>(i, d_model - 1);
+        }
+    }
+
+    // Normalize and convert to 8-bit for saving
+    cv::normalize(xSum, xSum, 0, 255, cv::NORM_MINMAX);
+    cv::normalize(ySum, ySum, 0, 255, cv::NORM_MINMAX);
+    xSum.convertTo(xSum, CV_8U);
+    ySum.convertTo(ySum, CV_8U);
+
+    cv::imwrite(savePath + "pos_encoding_x.png", xSum);
+    cv::imwrite(savePath + "pos_encoding_y.png", ySum);
+
+    if (includeBorderMarkers) {
+        cv::normalize(borderSum, borderSum, 0, 255, cv::NORM_MINMAX);
+        borderSum.convertTo(borderSum, CV_8U);
+        cv::imwrite(savePath + "pos_encoding_edge.png", borderSum);
     }
 }
 
@@ -358,14 +403,14 @@ void sphereImagesInBatches(const std::vector<std::string>& imagePaths, const int
             // Create positional encoding for the embedding on first image
             int patchPerRow = sqrt(embedding.rows);
             if (positionalEncoding.empty()) {
-                positionalEncoding = generatePositionalEncoding(embedding.rows, patchPerRow);
+                bool includeBorderMarkers = true;
+                positionalEncoding = generatePositionalEncoding(embedding.rows, patchPerRow, embedding.cols, includeBorderMarkers);
                 std::cout << "Saving positional encoding as images..." << std::endl;
-                savePositionalEncodingAsImages(positionalEncoding, patchPerRow, destDir + "/..");
+                savePositionalEncodingAsImages(patchPerRow, embedding.cols, includeBorderMarkers, destDir + "/../");
             }
 
-            // Concatenate positional encoding to the end of the embedding for every image
-            cv::hconcat(embedding, positionalEncoding, embedding);
-
+            // Element-wise sum the positional encoding to the image embedding, then save to batch
+            embedding += positionalEncoding;
             batchPatches.push_back(embedding);
 
             // Create labels for the centers
