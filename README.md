@@ -2,6 +2,8 @@
 
 This application loads an image dataset, creates an embedding based on probability of cluster membership, adds a positional encoding and saves it as HDF5 files. 
 
+![Examples of centroids](example_centroids.png)
+
 ### The details
 
 The program first crops each image to a square, then divides the images into patches. Cluster centroids are then created using the K-means++ method from a subset of patches. Every patch from every image then has its cosine similarity to each centroid calculated. Softmax is then applied to give the probability of a given patch belonging to each of the centroids. Currently this is a dense encoding, but would be easy to adapt as a sparse encoding by thresholding the probabilities.
